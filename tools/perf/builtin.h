@@ -4,7 +4,6 @@
 #include "util/util.h"
 #include "util/strbuf.h"
 
-extern const char perf_version_string[];
 extern const char perf_usage_string[];
 extern const char perf_more_info_string[];
 
@@ -26,6 +25,7 @@ extern int cmd_list(int argc, const char **argv, const char *prefix);
 extern int cmd_record(int argc, const char **argv, const char *prefix);
 extern int cmd_report(int argc, const char **argv, const char *prefix);
 extern int cmd_stat(int argc, const char **argv, const char *prefix);
+extern int cmd_periodic(int argc, const char **argv, const char *prefix);
 extern int cmd_timechart(int argc, const char **argv, const char *prefix);
 extern int cmd_top(int argc, const char **argv, const char *prefix);
 extern int cmd_script(int argc, const char **argv, const char *prefix);

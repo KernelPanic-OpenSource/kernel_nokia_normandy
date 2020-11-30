@@ -588,6 +588,9 @@ config CPU_TLB_V6
 config CPU_TLB_V7
 	bool
 
+config EMULATE_DOMAIN_MANAGER_V7
+	bool
+
 config VERIFY_PERMISSION_FAULT
 	bool
 endif
@@ -628,6 +631,24 @@ config IO_36
 	bool
 
 comment "Processor Features"
+
+config ARM_LPAE
+	bool "Support for the Large Physical Address Extension"
+	depends on MMU && CPU_32v7 && !CPU_32v6 && !CPU_32v5 && \
+		!CPU_32v4 && !CPU_32v3
+	help
+	  Say Y if you have an ARMv7 processor supporting the LPAE page
+	  table format and you would like to access memory beyond the
+	  4GB limit. The resulting kernel image will not run on
+	  processors without the LPA extension.
+
+	  If unsure, say N.
+
+config ARCH_PHYS_ADDR_T_64BIT
+	def_bool ARM_LPAE
+
+config ARCH_DMA_ADDR_T_64BIT
+	bool
 
 config ARM_THUMB
 	bool "Support Thumb user binaries"
@@ -705,7 +726,7 @@ config CPU_HIGH_VECTOR
 	bool "Select the High exception vector"
 	help
 	  Say Y here to select high exception vector(0xFFFF0000~).
-	  The exception vector can be vary depending on the platform
+	  The exception vector can vary depending on the platform
 	  design in nommu mode. If your platform needs to select
 	  high exception vector, say Y.
 	  Otherwise or if you are unsure, say N, and the low exception
@@ -737,6 +758,19 @@ config CPU_DCACHE_SIZE
 	  before compile time.
 	  If your SoC is configured to have a different size, define the value
 	  here with proper conditions.
+
+config CPU_CACHE_ERR_REPORT
+	bool "Report errors in the L1 and L2 caches"
+	depends on ARCH_MSM_SCORPION
+	default n
+	help
+	  The Scorpion processor supports reporting L2 errors, L1 icache parity
+	  errors, and L1 dcache parity errors as imprecise external aborts. If
+	  this option is not enabled these errors will go unreported and data
+	  corruption will occur.
+
+	  Say Y here to have errors in the L1 and L2 caches reported as
+	  imprecise data aborts.
 
 config CPU_DCACHE_WRITETHROUGH
 	bool "Force write through D-cache"
@@ -816,13 +850,23 @@ config CACHE_FEROCEON_L2_WRITETHROUGH
 	  Say Y here to use the Feroceon L2 cache in writethrough mode.
 	  Unless you specifically require this, say N for writeback mode.
 
+config MIGHT_HAVE_CACHE_L2X0
+	bool
+	help
+	  This option should be selected by machines which have a L2x0
+	  or PL310 cache controller, but where its use is optional.
+
+	  The only effect of this option is to make CACHE_L2X0 and
+	  related options available to the user for configuration.
+
+	  Boards or SoCs which always require the cache controller
+	  support to be present should select CACHE_L2X0 directly
+	  instead of this option, thus preventing the user from
+	  inadvertently configuring a broken kernel.
+
 config CACHE_L2X0
-	bool "Enable the L2x0 outer cache controller"
-	depends on REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || MACH_REALVIEW_PB1176 || \
-		   REALVIEW_EB_A9MP || SOC_IMX35 || SOC_IMX31 || MACH_REALVIEW_PBX || \
-		   ARCH_NOMADIK || ARCH_OMAP4 || ARCH_EXYNOS4 || ARCH_TEGRA || \
-		   ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_SHMOBILE
-	default y
+	bool "Enable the L2x0 outer cache controller" if MIGHT_HAVE_CACHE_L2X0
+	default MIGHT_HAVE_CACHE_L2X0
 	select OUTER_CACHE
 	select OUTER_CACHE_SYNC
 	help
@@ -835,6 +879,16 @@ config CACHE_PL310
 	help
 	  This option enables optimisations for the PL310 cache
 	  controller.
+
+config CACHE_PL310_ERP
+	tristate "PL310 CACHE Error Reporting"
+	depends on CACHE_PL310
+	help
+	  Say 'Y' here to enable reporting of external L2 cache errors.
+	  This feature can be used as a system debugging technique if cache
+	  corruption is suspected.
+	  Cache error statistics will also be reported in sysfs
+	  /sys/devices/platform/pl310_erp/cache_erp
 
 config CACHE_TAUROS2
 	bool "Enable the Tauros2 L2 cache controller"
@@ -855,6 +909,7 @@ config CACHE_XSC3L2
 
 config ARM_L1_CACHE_SHIFT_6
 	bool
+	default y if CPU_V7
 	help
 	  Setting ARM L1 cache line size to 64 Bytes.
 
@@ -889,3 +944,30 @@ config ARCH_HAS_BARRIERS
 	help
 	  This option allows the use of custom mandatory barriers
 	  included via the mach/barriers.h file.
+
+config VCM_MM
+	bool
+
+config VCM
+	bool "Virtual Contiguous Memory (VCM) Layer"
+	depends on MMU
+	select GENERIC_ALLOCATOR
+	select VCM_MM
+	default n
+	help
+	  Virtual Contiguous Memory layer. This is the layer that is intended to
+	  replace PMEM.
+
+	  If you don't know what this is, say N here.
+
+config STRICT_MEMORY_RWX
+	bool "restrict kernel memory permissions as much as possible"
+	default n
+	help
+	  If this is set, kernel text will be made RX, kernel data and stack
+	  RW, rodata R (otherwise all of the kernel 1-to-1 mapping is
+	  made RWX).
+	  The tradeoff is that several sections are padded to
+	  1M boundaries (because their permissions are different and
+	  splitting the 1M pages into 4K ones causes TLB performance
+	  problems), wasting memory.

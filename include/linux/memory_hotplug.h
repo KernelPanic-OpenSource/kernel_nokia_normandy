@@ -4,11 +4,15 @@
 #include <linux/mmzone.h>
 #include <linux/spinlock.h>
 #include <linux/notifier.h>
+#include <linux/bug.h>
 
 struct page;
 struct zone;
 struct pglist_data;
 struct mem_section;
+
+extern unsigned long movable_reserved_start, movable_reserved_size;
+extern unsigned long low_power_memory_start, low_power_memory_size;
 
 #ifdef CONFIG_MEMORY_HOTPLUG
 
@@ -68,11 +72,18 @@ static inline void zone_seqlock_init(struct zone *zone)
 extern int zone_grow_free_lists(struct zone *zone, unsigned long new_nr_pages);
 extern int zone_grow_waitqueues(struct zone *zone, unsigned long nr_pages);
 extern int add_one_highpage(struct page *page, int pfn, int bad_ppro);
-/* need some defines for these for archs that don't support it */
-extern void online_page(struct page *page);
 /* VM interface that may be used by firmware interface */
 extern int online_pages(unsigned long, unsigned long);
 extern void __offline_isolated_pages(unsigned long, unsigned long);
+
+typedef void (*online_page_callback_t)(struct page *page);
+
+extern int set_online_page_callback(online_page_callback_t callback);
+extern int restore_online_page_callback(online_page_callback_t callback);
+
+extern void __online_page_set_limits(struct page *page);
+extern void __online_page_increment_counters(struct page *page);
+extern void __online_page_free(struct page *page);
 
 #ifdef CONFIG_MEMORY_HOTREMOVE
 extern bool is_pageblock_removable_nolock(struct page *page);
@@ -232,4 +243,14 @@ extern void sparse_remove_one_section(struct zone *zone, struct mem_section *ms)
 extern struct page *sparse_decode_mem_map(unsigned long coded_mem_map,
 					  unsigned long pnum);
 
+extern void reserve_hotplug_pages(unsigned long start_pfn,
+				unsigned long nr_pages);
+extern void unreserve_hotplug_pages(unsigned long start_pfn,
+				unsigned long nr_pages);
 #endif /* __LINUX_MEMORY_HOTPLUG_H */
+extern int physical_remove_memory(u64 start, u64 size);
+extern int arch_physical_remove_memory(u64 start, u64 size);
+extern int physical_low_power_memory(u64 start, u64 size);
+extern int arch_physical_low_power_memory(u64 start, u64 size);
+extern int physical_active_memory(u64 start, u64 size);
+extern int arch_physical_active_memory(u64 start, u64 size);

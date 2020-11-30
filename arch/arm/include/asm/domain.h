@@ -2,6 +2,7 @@
  *  arch/arm/include/asm/domain.h
  *
  *  Copyright (C) 1999 Russell King.
+ *  Copyright (c) 2009, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -9,6 +10,10 @@
  */
 #ifndef __ASM_PROC_DOMAIN_H
 #define __ASM_PROC_DOMAIN_H
+
+#ifndef __ASSEMBLY__
+#include <asm/barrier.h>
+#endif
 
 /*
  * Domain numbers
@@ -27,8 +32,13 @@
  *
  * 36-bit addressing and supersections are only available on
  * CPUs based on ARMv6+ or the Intel XSC3 core.
+ *
+ * We cannot use domain 0 for the kernel on QSD8x50 since the kernel domain
+ * is set to manager mode when set_fs(KERNEL_DS) is called. Setting domain 0
+ * to manager mode will disable the workaround for a cpu bug that can cause an
+ * invalid fault status and/or tlb corruption (CONFIG_VERIFY_PERMISSION_FAULT).
  */
-#ifndef CONFIG_IO_36
+#if !defined(CONFIG_IO_36) && !defined(CONFIG_VERIFY_PERMISSION_FAULT)
 #define DOMAIN_KERNEL	0
 #define DOMAIN_TABLE	0
 #define DOMAIN_USER	1
@@ -56,6 +66,17 @@
 #ifndef __ASSEMBLY__
 
 #ifdef CONFIG_CPU_USE_DOMAINS
+#ifdef CONFIG_EMULATE_DOMAIN_MANAGER_V7
+void emulate_domain_manager_set(u32 domain);
+int emulate_domain_manager_data_abort(u32 dfsr, u32 dfar);
+int emulate_domain_manager_prefetch_abort(u32 ifsr, u32 ifar);
+void emulate_domain_manager_switch_mm(
+	unsigned long pgd_phys,
+	struct mm_struct *mm,
+	void (*switch_mm)(unsigned long pgd_phys, struct mm_struct *));
+
+#define set_domain(x) emulate_domain_manager_set(x)
+#else
 #define set_domain(x)					\
 	do {						\
 	__asm__ __volatile__(				\
@@ -63,6 +84,7 @@
 	  : : "r" (x));					\
 	isb();						\
 	} while (0)
+#endif
 
 #define modify_domain(dom,type)					\
 	do {							\
@@ -83,9 +105,9 @@
  * instructions (inline assembly)
  */
 #ifdef CONFIG_CPU_USE_DOMAINS
-#define T(instr)	#instr "t"
+#define TUSER(instr)	#instr "t"
 #else
-#define T(instr)	#instr
+#define TUSER(instr)	#instr
 #endif
 
 #else /* __ASSEMBLY__ */
@@ -95,9 +117,9 @@
  * instructions
  */
 #ifdef CONFIG_CPU_USE_DOMAINS
-#define T(instr)	instr ## t
+#define TUSER(instr)	instr ## t
 #else
-#define T(instr)	instr
+#define TUSER(instr)	instr
 #endif
 
 #endif /* __ASSEMBLY__ */
